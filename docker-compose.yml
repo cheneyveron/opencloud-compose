@@ -51,6 +51,32 @@ services:
       OC_PASSWORD_POLICY_MIN_UPPERCASE_CHARACTERS: "${OC_PASSWORD_POLICY_MIN_UPPERCASE_CHARACTERS:-1}"
       OC_PASSWORD_POLICY_MIN_DIGITS: "${OC_PASSWORD_POLICY_MIN_DIGITS:-1}"
       OC_PASSWORD_POLICY_MIN_SPECIAL_CHARACTERS: "${OC_PASSWORD_POLICY_MIN_SPECIAL_CHARACTERS:-1}"
+      # Exclude storage-users service from the main opencloud service
+      OC_EXCLUDE_RUN_SERVICES: "storage-users"
+      # Configure gateway to use storage-users from separate container
+      GATEWAY_STORAGE_USERS_ENDPOINT: "dns:storage-users:9157"
+      GATEWAY_STORAGE_USERS_MOUNT_ID: "storage-users-1"
+      OC_GATEWAY_GRPC_ADDR: "0.0.0.0:9142"
+      NATS_NATS_HOST: "0.0.0.0"
+      NATS_NATS_PORT: 9233
+      NATS_NATS_CLUSTER_ID: "opencloud-cluster"
+      # Use external NATS bus service
+      # OC_EVENTS_ENDPOINT: "nats://nats:9233"
+      OC_EVENTS_CLUSTER: "opencloud-cluster"
+      MICRO_REGISTRY: "nats-js-kv"
+      # MICRO_REGISTRY_ADDRESS: "nats://nats:9233"
+      OC_MACHINE_AUTH_API_KEY: "${OC_MACHINE_AUTH_API_KEY:-some-opencloud-machine-auth-api-key}"
+      OC_TRANSFER_SECRET: "${OC_TRANSFER_SECRET:-some-opencloud-transfer-secret}"
+      OC_JWT_SECRET: "${OC_JWT_SECRET:-some-opencloud-jwt-secret}"
+      PROXY_AUTOPROVISION_ACCOUNTS: "true"
+      OC_SERVICE_ACCOUNT_ID: "${OC_SERVICE_ACCOUNT_ID:-serviceaccount}"
+      OC_SERVICE_ACCOUNT_SECRET: "${OC_SERVICE_ACCOUNT_SECRET:-serviceaccountsecret}"
+      OC_SYSTEM_USER_ID: "${OC_SYSTEM_USER_ID:-some-system-user-id-000-000000000000}"
+      OC_SYSTEM_USER_API_KEY: "${OC_SYSTEM_USER_API_KEY:-some-system-user-machine-auth-api-key}"
+      # Permission
+      # GATEWAY_PERMISSIONS_ENDPOINT: "eu.opencloud.api.settings"
+      GATEWAY_PERMISSIONS_ENDPOINT: "opencloud:9224"
+      OC_GRPC_CLIENT_TLS_MODE: "off"
     volumes:
       - ./config/opencloud/csp.yaml:/etc/opencloud/csp.yaml
       - ./config/opencloud/banned-password-list.txt:/etc/opencloud/banned-password-list.txt
@@ -61,6 +87,71 @@ services:
     logging:
       driver: ${LOG_DRIVER:-local}
     restart: always
+
+  storage-users:
+    image: ${OC_DOCKER_IMAGE:-opencloudeu/opencloud-rolling}:${OC_DOCKER_TAG:-latest}
+    networks:
+      opencloud-net:
+    entrypoint:
+      - /bin/sh
+    # run opencloud init to initialize a configuration file with random secrets
+    # it will fail on subsequent runs, because the config file already exists
+    # therefore we ignore the error and then start only the storage-users service
+    command: ["-c", "opencloud init || true; opencloud server"]
+    environment:
+      STORAGE_USERS_POSIX_PERMISSIONS_ENDPOINT: "eu.opencloud.api.settings"
+      # STORAGE_USERS_PERMISSION_ENDPOINT: "posix"
+      # STORAGE_USERS_POSIX_PERMISSIONS_ENDPOINT: "dns:opencloud:9224"
+      OC_GRPC_CLIENT_TLS_MODE: "off"
+      # Storage User setting
+      STORAGE_USERS_DRIVER: "posix"
+      STORAGE_USERS_POSIX_ROOT: "/var/lib/opencloud/storage/"
+      STORAGE_USERS_POSIX_SCAN_DEBOUNCE_DELAY: 0
+      # 并发控制
+      STORAGE_USERS_POSIX_MAX_CONCURRENCY: 10
+      STORAGE_USERS_POSIX_MAX_ACQUIRE_LOCK_CYCLES: 20
+      STORAGE_USERS_POSIX_LOCK_CYCLE_DURATION_FACTOR: 200
+      STORAGE_USERS_POSIX_WATCH_FS: true
+      STORAGE_USERS_POSIX_WATCH_TYPE: inotifywait
+      STORAGE_USERS_POSIX_WATCH_PATH: /var/lib/opencloud/storage/
+      OC_URL: https://${OC_DOMAIN:-cloud.opencloud.test}
+      OC_LOG_LEVEL: "trace"
+      OC_LOG_COLOR: "${LOG_PRETTY:-false}"
+      OC_LOG_PRETTY: "${LOG_PRETTY:-false}"
+      # INSECURE: needed if OpenCloud / reverse proxy is using self generated certificates
+      OC_INSECURE: "${INSECURE:-false}"
+      # Run only the storage-users service, connect to main container's nats and gateway
+      OC_RUN_SERVICES: "storage-users"
+      # Connect to the main container's NATS service
+      OC_EVENTS_ENDPOINT: "nats://opencloud:9233"
+      OC_EVENTS_CLUSTER: "opencloud-cluster"
+      STORAGE_USERS_EVENTS_ENDPOINT: "nats://opencloud:9233"
+      STORAGE_USERS_EVENTS_CLUSTER: "opencloud-cluster"
+      MICRO_REGISTRY: "nats-js-kv"
+      MICRO_REGISTRY_ADDRESS: "nats://opencloud:9233"
+      STORAGE_USERS_MOUNT_ID: "storage-users-1"
+      STORAGE_USERS_SERVICE_ACCOUNT_ID: "${OC_SERVICE_ACCOUNT_ID:-serviceaccount}"
+      STORAGE_USERS_SERVICE_ACCOUNT_SECRET: "${OC_SERVICE_ACCOUNT_SECRET:-serviceaccountsecret}"
+      OC_MACHINE_AUTH_API_KEY: "${OC_MACHINE_AUTH_API_KEY:-some-opencloud-machine-auth-api-key}"
+      OC_TRANSFER_SECRET: "${OC_TRANSFER_SECRET:-some-opencloud-transfer-secret}"
+      OC_JWT_SECRET: "${OC_JWT_SECRET:-some-opencloud-jwt-secret}"
+      # Storage-users specific configuration
+      STORAGE_USERS_SERVICE_NAME: "storage-users"
+      STORAGE_USERS_GRACEFUL_SHUTDOWN_TIMEOUT: 30
+      # Configure storage-users to bind to all interfaces so it can be reached from other containers
+      STORAGE_USERS_GRPC_ADDR: "0.0.0.0:9157"
+      # Configure Reva gateway address to point to main container
+      STORAGE_USERS_GATEWAY_GRPC_ADDR: "opencloud:9142"
+    volumes:
+      # Share the same configuration and data directories
+      - ${OC_CONFIG_DIR:-opencloud-config}:/etc/opencloud
+      - ${OC_DATA_DIR:-opencloud-data}:/var/lib/opencloud
+    logging:
+      driver: ${LOG_DRIVER:-local}
+    restart: always
+    depends_on:
+      opencloud:
+        condition: service_started
 
 volumes:
   opencloud-config:

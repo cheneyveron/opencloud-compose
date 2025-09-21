@@ -9,6 +9,15 @@ services:
       OC_CACHE_TTL: 3600
       OC_CACHE_DATABASE: 0
 
+  storage-users:
+   environment:
+      STORAGE_USERS_FILEMETADATA_CACHE_STORE: redis-sentinel
+      STORAGE_USERS_ID_CACHE_STORE: redis-sentinel
+      OC_CACHE_STORE: redis-sentinel
+      OC_CACHE_STORE_NODES: redis-sentinel-1:26379/redismaster,redis-sentinel-2:26379/redismaster
+      OC_CACHE_TTL: 3600
+      OC_CACHE_DATABASE: 0
+
   # Redis Master
   redismaster:
     image: redis:7-alpine

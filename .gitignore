@@ -1,6 +1,7 @@
 .idea
 # exclude the .env file which will be created from env.example
 .env
+container_data
 
 # exclude the apps folder
 /config/opencloud/apps/*
