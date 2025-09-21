@@ -77,9 +77,11 @@ services:
       # GATEWAY_PERMISSIONS_ENDPOINT: "eu.opencloud.api.settings"
       GATEWAY_PERMISSIONS_ENDPOINT: "opencloud:9224"
       OC_GRPC_CLIENT_TLS_MODE: "off"
+      SETTINGS_BUNDLES_PATH: "/etc/opencloud/settings/bundles.json"
     volumes:
       - ./config/opencloud/csp.yaml:/etc/opencloud/csp.yaml
       - ./config/opencloud/banned-password-list.txt:/etc/opencloud/banned-password-list.txt
+      - ./config/settings/bundles.json:/etc/opencloud/settings/bundles.json:ro
       # configure the .env file to use own paths instead of docker internal volumes
       - ${OC_CONFIG_DIR:-opencloud-config}:/etc/opencloud
       - ${OC_DATA_DIR:-opencloud-data}:/var/lib/opencloud
