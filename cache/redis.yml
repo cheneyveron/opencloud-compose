@@ -54,8 +54,6 @@ services:
         echo 'sentinel failover-timeout redismaster 10000' >> /tmp/sentinel.conf &&
         redis-sentinel /tmp/sentinel.conf
       "
-    ports:
-      - "26379:26379"
     depends_on:
       redismaster:
         condition: service_healthy
@@ -78,8 +76,6 @@ services:
         echo 'sentinel failover-timeout redismaster 10000' >> /tmp/sentinel.conf &&
         redis-sentinel /tmp/sentinel.conf
       "
-    ports:
-      - "26380:26379"
     depends_on:
       redismaster:
         condition: service_healthy
